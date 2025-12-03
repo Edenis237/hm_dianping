@@ -1,6 +1,7 @@
 package com.hmdp.service.impl;
 
 import cn.hutool.core.bean.BeanUtil;
+import cn.hutool.core.bean.copier.CopyOptions;
 import cn.hutool.core.util.RandomUtil;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.hmdp.dto.LoginFormDTO;
@@ -14,9 +15,18 @@ import com.hmdp.utils.SystemConstants;
 import com.hmdp.vo.UserVo;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.BeanUtils;
+import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
 
+import javax.annotation.Resource;
 import javax.servlet.http.HttpSession;
+
+import java.util.HashMap;
+import java.util.Map;
+import java.util.UUID;
+import java.util.concurrent.TimeUnit;
+
+import static com.hmdp.utils.RedisConstants.*;
 
 /**
  * <p>
@@ -29,6 +39,9 @@ import javax.servlet.http.HttpSession;
 @Service
 @Slf4j
 public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements IUserService {
+
+    @Resource
+    private StringRedisTemplate stringRedisTemplate;
 
     /**
      * 发送手机验证码
@@ -45,8 +58,8 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements IU
         }
         // 格式有效，生产验证码
         String code = RandomUtil.randomNumbers(6);
-        // 保存验证码到session
-        session.setAttribute(phone,code);
+        // 保存验证码到Redis
+        stringRedisTemplate.opsForValue().set(LOGIN_CODE_KEY + phone,code,LOGIN_CODE_TTL, TimeUnit.MINUTES);
         // 模拟发送短信验证码
         log.debug("向{}发送短信验证码成功，验证码：{}", phone, code);
         // 返回ok
@@ -65,11 +78,11 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements IU
             return Result.fail("手机格式错误!");
         }
         // 校验验证码
-        Object cacheCode = session.getAttribute(phone);
+        String cacheCode = stringRedisTemplate.opsForValue().get(LOGIN_CODE_KEY + phone);
         String code = loginForm.getCode();
 
         // 如果没有发送验证码，或者session中验证码过期，验证码不一致
-        if (cacheCode == null || !cacheCode.toString().equals(code)){
+        if (cacheCode == null || !cacheCode.equals(code)){
             return Result.fail("验证码错误！");
         }
         // 一致，根据手机号查询用户
@@ -79,9 +92,22 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements IU
             // 不存在创建新用户保存并返回
             user = createUserWithPhone(phone);
         }
-        //保存用户到session中
-        session.setAttribute("user", BeanUtil.copyProperties(user, UserDTO.class));;
-        return Result.ok();
+        //保存用户信息到redis中
+        // 随机生成token，作为登录令牌
+        String token = UUID.randomUUID().toString();
+        // 将User转为HashMap存储
+        UserDTO userDTO = BeanUtil.copyProperties(user, UserDTO.class);
+        Map<String, Object> userMap = BeanUtil.beanToMap(userDTO,new HashMap<>(),
+                CopyOptions.create()
+                        .setIgnoreNullValue(true)
+                        .setFieldValueEditor((fieldName,fieldValue) -> fieldValue.toString()));
+        // 存储
+        String tokenKey = LOGIN_USER_KEY + token;
+        stringRedisTemplate.opsForHash().putAll(tokenKey,userMap);
+        // 设置token有效期
+        stringRedisTemplate.expire(tokenKey,30,TimeUnit.MINUTES);
+        // 返回token
+        return Result.ok(token);
     }
 
     /**
