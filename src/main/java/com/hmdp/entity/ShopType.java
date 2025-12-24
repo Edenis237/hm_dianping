@@ -13,7 +13,7 @@ import java.time.LocalDateTime;
 
 /**
  * <p>
- * 
+ *
  * </p>
  *
  * @author 虎哥
@@ -51,13 +51,13 @@ public class ShopType implements Serializable {
     /**
      * 创建时间
      */
-    @JsonIgnore
+
     private LocalDateTime createTime;
 
     /**
      * 更新时间
      */
-    @JsonIgnore
+
     private LocalDateTime updateTime;
 
 
