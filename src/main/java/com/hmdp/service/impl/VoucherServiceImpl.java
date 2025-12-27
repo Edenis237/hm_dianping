@@ -90,17 +90,20 @@ public class VoucherServiceImpl extends ServiceImpl<VoucherMapper, Voucher> impl
                 .setSql("stock = stock - 1")
                 .eq("voucher_id", voucherId).update();
 
+        if(!success){
+            return Result.fail("库存不足");
+        }
         // 创建订单
         VoucherOrder voucherOrder = new VoucherOrder();
         // 生成订单号
-        long order = redisIdWorker.nextId("order");
-        voucherOrder.setId(order);
+        long orderId = redisIdWorker.nextId("order");
+        voucherOrder.setId(orderId);
         // 获取用户ID
         voucherOrder.setUserId(((UserDTO)BaseContext.get()).getId());
         // 获取优惠券ID
         voucherOrder.setVoucherId(voucherId);
         // 保存订单
         voucherOrderService.save(voucherOrder);
-        return Result.ok();
+        return Result.ok(orderId);
     }
 }
