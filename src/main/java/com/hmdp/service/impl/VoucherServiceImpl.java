@@ -12,6 +12,7 @@ import com.hmdp.service.IVoucherOrderService;
 import com.hmdp.service.IVoucherService;
 import com.hmdp.utils.BaseContext;
 import com.hmdp.utils.RedisIdWorker;
+import org.springframework.aop.framework.AopContext;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -32,13 +33,6 @@ public class VoucherServiceImpl extends ServiceImpl<VoucherMapper, Voucher> impl
 
     @Resource
     private ISeckillVoucherService seckillVoucherService;
-
-    @Resource
-    private IVoucherOrderService voucherOrderService;
-
-    @Resource
-    private RedisIdWorker redisIdWorker;
-
     @Override
     public Result queryVoucherOfShop(Long shopId) {
         // 查询优惠券信息
@@ -59,52 +53,5 @@ public class VoucherServiceImpl extends ServiceImpl<VoucherMapper, Voucher> impl
         seckillVoucher.setBeginTime(voucher.getBeginTime());
         seckillVoucher.setEndTime(voucher.getEndTime());
         seckillVoucherService.save(seckillVoucher);
-    }
-
-    @Override
-    @Transactional
-    public Result seckillVoucher(Long voucherId) {
-        // 查询优惠券
-        SeckillVoucher voucher = seckillVoucherService.getById(voucherId);
-
-        //判断秒杀是否开始
-        if (voucher.getBeginTime().isAfter(LocalDateTime.now())) {
-            // 尚未开始
-            return Result.fail("秒杀尚未开始");
-        }
-
-        //判断秒杀是否结束
-        if (voucher.getEndTime().isBefore(LocalDateTime.now())){
-            //已经结束
-            return Result.fail("秒杀已经结束");
-        }
-
-        //判断优惠券是否充足
-        if (voucher.getStock() < 1){
-            // 优惠券库存不足
-            return Result.fail("优惠券库存不足");
-        }
-
-        // 扣减库存
-        boolean success = seckillVoucherService.update()
-                .setSql("stock = stock - 1")
-                .eq("voucher_id", voucherId).gt("stock",0)
-                .update();
-
-        if(!success){
-            return Result.fail("库存不足");
-        }
-        // 创建订单
-        VoucherOrder voucherOrder = new VoucherOrder();
-        // 生成订单号
-        long orderId = redisIdWorker.nextId("order");
-        voucherOrder.setId(orderId);
-        // 获取用户ID
-        voucherOrder.setUserId(((UserDTO)BaseContext.get()).getId());
-        // 获取优惠券ID
-        voucherOrder.setVoucherId(voucherId);
-        // 保存订单
-        voucherOrderService.save(voucherOrder);
-        return Result.ok(orderId);
     }
 }

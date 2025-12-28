@@ -2,6 +2,7 @@ package com.hmdp.controller;
 
 
 import com.hmdp.dto.Result;
+import com.hmdp.service.IVoucherOrderService;
 import com.hmdp.service.IVoucherService;
 import org.springframework.web.bind.annotation.*;
 
@@ -20,11 +21,16 @@ import javax.annotation.Resource;
 public class VoucherOrderController {
 
     @Resource
-    private IVoucherService voucherService;
+    private IVoucherOrderService voucherOrderService;
 
+    /**
+     * 秒杀优惠券
+     * @param voucherId 优惠券id
+     * @return 订单id
+     */
     @PostMapping("seckill/{id}")
     public Result seckillVoucher(@PathVariable("id") Long voucherId) {
-        Result result = voucherService.seckillVoucher(voucherId);
+        Result result = voucherOrderService.seckillVoucher(voucherId);
         return Result.ok(result);
     }
 }
