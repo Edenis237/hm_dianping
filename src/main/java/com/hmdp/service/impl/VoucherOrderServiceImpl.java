@@ -72,7 +72,7 @@ public class VoucherOrderServiceImpl extends ServiceImpl<VoucherOrderMapper, Vou
         try {
             // 获取代理对象（事务）
             IVoucherOrderService proxy = (IVoucherOrderService) AopContext.currentProxy();
-            return proxy.createSecKillVoucherOrder(userId,voucherId);
+            return proxy.createSecKillVoucherOrder(voucherId);
         } finally {
             lock.unlock();
         }
@@ -80,7 +80,8 @@ public class VoucherOrderServiceImpl extends ServiceImpl<VoucherOrderMapper, Vou
     }
 
     @Transactional
-    public Result createSecKillVoucherOrder(Long userId, Long voucherId) {
+    public Result createSecKillVoucherOrder(Long voucherId) {
+        Long userId = ((UserDTO) BaseContext.get()).getId();
         // 判断用户是否已经下过单
         int count = query().eq("user_id", userId).eq("voucher_id", voucherId).count();
         if (count > 0) {
